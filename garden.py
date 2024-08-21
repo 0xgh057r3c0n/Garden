@@ -11,7 +11,8 @@ from bs4 import BeautifulSoup
 import argparse
 
 # Define the banner
-BANNER = """
+BANNER = '''
+
   .,-:::::/   :::.    :::::::.. :::::::-.  .,:::::::::.    :::.
 ,;;-'````'    ;;`;;   ;;;;``;;;; ;;,   `';,;;;;''''`;;;;,  `;;;
 [[[   [[[[[[/,[[ '[[,  [[[,/[[[' `[[     [[ [[cccc   [[[[[. '[[
@@ -22,7 +23,7 @@ BANNER = """
  Union-Based SQL Injection Tool
  Version: Graden
  Author: G4UR4V007
-"""
+'''
 
 # Define the usage
 USAGE = """
