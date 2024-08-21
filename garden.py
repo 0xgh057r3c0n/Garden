@@ -11,19 +11,19 @@ from bs4 import BeautifulSoup
 import argparse
 
 # Define the banner
-BANNER = '''
-
-  .,-:::::/   :::.    :::::::.. :::::::-.  .,:::::::::.    :::.
-,;;-'````'    ;;`;;   ;;;;``;;;; ;;,   `';,;;;;''''`;;;;,  `;;;
-[[[   [[[[[[/,[[ '[[,  [[[,/[[[' `[[     [[ [[cccc   [[[[[. '[[
-"$$c.    "$$c$$$cc$$$c $$$$$$c    $$,    $$ $$""""   $$$ "Y$c$$
- `Y8bo,,,o88o888   888,888b "88bo,888_,o8P' 888oo,__ 888    Y88
-   `'YMUP"YMMYMM   ""` MMMM   "W" MMMMP"`   """"YUMMMMMM     YM
-
+BANNER = """
+  _____               _            
+ / ____|             | |           
+| |  __  __ _ _ __ __| | ___ _ __  
+| | |_ |/ _` | '__/ _` |/ _ \ '_ \ 
+| |__| | (_| | | | (_| |  __/ | | |
+ \_____|\__,_|_|  \__,_|\___|_| |_|
+                                   
+                                   
  Union-Based SQL Injection Tool
  Version: Graden
  Author: G4UR4V007
-'''
+"""
 
 # Define the usage
 USAGE = """
