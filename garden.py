@@ -21,7 +21,7 @@ BANNER = """
                                    
                                    
  Union-Based SQL Injection Tool
- Version: Graden
+ Version: 1.0
  Author: G4UR4V007
 """
 
